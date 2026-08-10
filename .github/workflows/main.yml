@@ -19,10 +19,27 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    - name: Cache Gradle
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle') }}
+        restore-keys: gradle-${{ runner.os }}-
+
     - name: Build modern map for sky robot
       run: |
         cat << 'EOF' > settings.gradle
         rootProject.name = "NullLauncher"
+
+        dependencyResolutionManagement {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+
         include ':app'
         EOF
 
@@ -32,40 +49,4 @@ jobs:
         if [ -d src ]; then mv src app/src/main/; fi
 
         # Scrape old name tag off manifest file
-        sed -i 's/package="[^"]*"//g' app/src/main/AndroidManifest.xml
-
-        cat << 'EOF' > build.gradle
-        buildscript {
-            repositories { google(); mavenCentral() }
-            dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
-        }
-        EOF
-
-        cat << 'EOF' > app/build.gradle
-        plugins {
-            id 'com.android.application'
-        }
-
-        android {
-            namespace 'com.notriddle.null_launcer'
-            compileSdk 34
-
-            defaultConfig {
-                applicationId "com.notriddle.null_launcer"
-                minSdk 24
-                targetSdk 34
-                versionCode 1
-                versionName "1.0"
-            }
-        }
-        EOF
-
-    - name: Bake 64-bit APK
-      run: gradle assembleDebug
-
-    - name: Save finished APK
-      uses: actions/upload-artifact@v4.4.3
-      with:
-        name: NullLauncher-Modern
-        path: "app/build/outputs/apk/debug/*.apk"
-        
+        sed -i 's/package="[^"]*"
