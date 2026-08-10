@@ -31,6 +31,9 @@ jobs:
         if [ -d res ]; then mv res app/src/main/; fi
         if [ -d src ]; then mv src app/src/main/; fi
 
+        # Scrape old name tag off manifest file
+        sed -i 's/package="[^"]*"//g' app/src/main/AndroidManifest.xml
+
         cat << 'EOF' > build.gradle
         buildscript {
             repositories { google(); mavenCentral() }
@@ -44,11 +47,11 @@ jobs:
         }
 
         android {
-            namespace 'com.notriddle.nullactivity'
+            namespace 'com.notriddle.null_launcer'
             compileSdk 34
 
             defaultConfig {
-                applicationId "com.notriddle.nullactivity"
+                applicationId "com.notriddle.null_launcer"
                 minSdk 24
                 targetSdk 34
                 versionCode 1
@@ -65,3 +68,4 @@ jobs:
       with:
         name: NullLauncher-Modern
         path: "app/build/outputs/apk/debug/*.apk"
+        
