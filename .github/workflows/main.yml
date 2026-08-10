@@ -16,8 +16,8 @@ jobs:
     - name: Set up Java 17
       uses: actions/setup-java@v4.4.0
       with:
-        java-version: '17'
-        distribution: 'temurin'
+        java-version: "17"
+        distribution: "temurin"
 
     - name: Cache Gradle
       uses: actions/cache@v4
@@ -25,12 +25,12 @@ jobs:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
-        key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle') }}
+        key: gradle-${{ runner.os }}-${{ hashFiles(**/*.gradle) }}
         restore-keys: gradle-${{ runner.os }}-
 
     - name: Build modern map for sky robot
       run: |
-        cat << 'EOF' > settings.gradle
+        cat > settings.gradle << "EOF"
         rootProject.name = "NullLauncher"
 
         dependencyResolutionManagement {
@@ -40,7 +40,7 @@ jobs:
             }
         }
 
-        include ':app'
+        include ":app"
         EOF
 
         mkdir -p app/src/main
@@ -48,5 +48,39 @@ jobs:
         if [ -d res ]; then mv res app/src/main/; fi
         if [ -d src ]; then mv src app/src/main/; fi
 
-        # Scrape old name tag off manifest file
-        sed -i 's/package="[^"]*"
+        sed -i "s/package=\"[^\"]*\"//g" app/src/main/AndroidManifest.xml
+
+        cat > build.gradle << "EOF"
+        buildscript {
+            repositories { google(); mavenCentral() }
+            dependencies { classpath "com.android.tools.build:gradle:8.2.2" }
+        }
+        EOF
+
+        cat > app/build.gradle << "EOF"
+        plugins {
+            id "com.android.application"
+        }
+
+        android {
+            namespace "com.notriddle.null_launcer"
+            compileSdk 34
+
+            defaultConfig {
+                applicationId "com.notriddle.null_launcer"
+                minSdk 24
+                targetSdk 34
+                versionCode 1
+                versionName "1.0"
+            }
+        }
+        EOF
+
+    - name: Bake 64-bit APK
+      run: gradle assembleDebug --no-daemon
+
+    - name: Save finished APK
+      uses: actions/upload-artifact@v4.4.3
+      with:
+        name: NullLauncher-Modern
+        path: "app/build/outputs/apk/debug/*.apk"
