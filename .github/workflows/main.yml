@@ -22,6 +22,20 @@ jobs:
     - name: Build modern map for sky robot
       run: |
         cat << 'EOF' > settings.gradle
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
         rootProject.name = "NullLauncher"
         include ':app'
         EOF
@@ -32,12 +46,19 @@ jobs:
         if [ -d src ]; then mv src app/src/main/; fi
 
         # Scrape old name tag off manifest file
-        sed -i 's/package="[^"]*"//g' app/src/main/AndroidManifest.xml
+        if [ -f app/src/main/AndroidManifest.xml ]; then
+          sed -i 's/package="[^"]*"//g' app/src/main/AndroidManifest.xml
+        fi
 
         cat << 'EOF' > build.gradle
         buildscript {
-            repositories { google(); mavenCentral() }
-            dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:8.2.2'
+            }
         }
         EOF
 
@@ -68,4 +89,4 @@ jobs:
       with:
         name: NullLauncher-Modern
         path: "app/build/outputs/apk/debug/*.apk"
-      
+        
