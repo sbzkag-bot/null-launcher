@@ -19,17 +19,49 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Make starter stick
-      run: gradle wrapper
+    - name: Build modern map for sky robot
+      run: |
+        cat << 'EOF' > settings.gradle
+        rootProject.name = "NullLauncher"
+        include ':app'
+        EOF
 
-    - name: Set permission
-      run: chmod +x gradlew
+        mkdir -p app/src/main
+        if [ -f AndroidManifest.xml ]; then mv AndroidManifest.xml app/src/main/; fi
+        if [ -d res ]; then mv res app/src/main/; fi
+        if [ -d src ]; then mv src app/src/main/; fi
 
-    - name: Build 64-bit APK
-      run: ./gradlew assembleRelease --no-daemon
+        cat << 'EOF' > build.gradle
+        buildscript {
+            repositories { google(); mavenCentral() }
+            dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
+        }
+        EOF
+
+        cat << 'EOF' > app/build.gradle
+        plugins {
+            id 'com.android.application'
+        }
+
+        android {
+            namespace 'com.notriddle.nullactivity'
+            compileSdk 34
+
+            defaultConfig {
+                applicationId "com.notriddle.nullactivity"
+                minSdk 24
+                targetSdk 34
+                versionCode 1
+                versionName "1.0"
+            }
+        }
+        EOF
+
+    - name: Bake 64-bit APK
+      run: gradle assembleDebug
 
     - name: Save finished APK
       uses: actions/upload-artifact@v4.4.3
       with:
         name: NullLauncher-Modern
-        path: "**/build/outputs/apk/**/*.apk"
+        path: "app/build/outputs/apk/debug/*.apk"
