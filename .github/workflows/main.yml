@@ -105,3 +105,4 @@ jobs:
       with:
         name: NullLauncher-Modern
         path: "app/build/outputs/apk/debug/*.apk"
+        
