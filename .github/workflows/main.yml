@@ -66,11 +66,12 @@ jobs:
             <application
                 android:label="Null Launcher"
                 android:hasCode="true"
-                android:theme="@android:style/Theme.Translucent.NoTitleBar">
+                android:icon="@android:drawable/sym_def_app_icon"
+                android:theme="@android:style/Theme.Wallpaper.NoTitleBar">
                 <activity
                     android:name=".MainActivity"
                     android:exported="true"
-                    android:launchMode="singleTask"
+                    android:launchMode="singleInstance"
                     android:stateNotNeeded="true">
                     <intent-filter>
                         <action android:name="android.intent.action.MAIN" />
@@ -87,12 +88,14 @@ jobs:
 
         import android.app.Activity;
         import android.os.Bundle;
+        import android.view.View;
 
         public class MainActivity extends Activity {
             @Override
             protected void onCreate(Bundle savedInstanceState) {
                 super.onCreate(savedInstanceState);
-                finish();
+                View emptyView = new View(this);
+                setContentView(emptyView);
             }
         }
         EOF
@@ -105,4 +108,3 @@ jobs:
       with:
         name: NullLauncher-Modern
         path: "app/build/outputs/apk/debug/*.apk"
-        
