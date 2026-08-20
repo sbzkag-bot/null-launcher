@@ -19,7 +19,7 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Generate edge-to-edge app code
+    - name: Generate clean launcher code
       run: |
         rm -rf app src res AndroidManifest.xml
         mkdir -p app/src/main/java/com/notriddle/nulllauncher
@@ -67,7 +67,7 @@ jobs:
                 android:label="Null Launcher"
                 android:hasCode="true"
                 android:icon="@android:drawable/sym_def_app_icon"
-                android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+                android:theme="@android:style/Theme.Wallpaper.NoTitleBar">
                 <activity
                     android:name=".MainActivity"
                     android:exported="true"
