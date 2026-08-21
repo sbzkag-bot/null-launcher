@@ -19,7 +19,7 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Generate clean launcher code
+    - name: Generate custom mapped launcher code
       run: |
         rm -rf app src res AndroidManifest.xml
         mkdir -p app/src/main/java/com/notriddle/nulllauncher
@@ -63,6 +63,9 @@ jobs:
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+            <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
             <application
                 android:label="Null Launcher"
                 android:hasCode="true"
@@ -87,14 +90,23 @@ jobs:
         package com.notriddle.nulllauncher;
 
         import android.app.Activity;
+        import android.content.Intent;
+        import android.content.pm.PackageManager;
         import android.graphics.Color;
         import android.os.Build;
         import android.os.Bundle;
+        import android.view.GestureDetector;
+        import android.view.MotionEvent;
         import android.view.View;
         import android.view.Window;
         import android.view.WindowManager;
+        import android.widget.Toast;
 
         public class MainActivity extends Activity {
+            private GestureDetector gestureDetector;
+            private static final String SWIPE_UP_PACKAGE = "ginlemon.smartdrawer";
+            private static final String DOUBLE_TAP_PACKAGE = "com.tiendnm.zukulock";
+
             @Override
             protected void onCreate(Bundle savedInstanceState) {
                 super.onCreate(savedInstanceState);
@@ -116,8 +128,57 @@ jobs:
                         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
                 }
 
+                gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+                    private static final int SWIPE_THRESHOLD = 100;
+                    private static final int SWIPE_VELOCITY_THRESHOLD = 100;
+
+                    @Override
+                    public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                        if (e1 == null || e2 == null) return false;
+                        float diffY = e2.getY() - e1.getY();
+                        float diffX = e2.getX() - e1.getX();
+
+                        if (Math.abs(diffY) > Math.abs(diffX)) {
+                            if (Math.abs(diffY) > SWIPE_THRESHOLD && Math.abs(velocityY) > SWIPE_VELOCITY_THRESHOLD) {
+                                if (diffY > 0) {
+                                    // Swipe Down -> Notifications
+                                    try {
+                                        Object service = getSystemService("statusbar");
+                                        Class<?> statusbarManager = Class.forName("android.app.StatusBarManager");
+                                        java.lang.reflect.Method expand = statusbarManager.getMethod("expandNotificationsPanel");
+                                        expand.invoke(service);
+                                    } catch (Exception ignored) {}
+                                } else {
+                                    // Swipe Up -> Smart Drawer
+                                    openApp(SWIPE_UP_PACKAGE);
+                                }
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onDoubleTap(MotionEvent e) {
+                        // Double Tap -> Zuku Lock
+                        openApp(DOUBLE_TAP_PACKAGE);
+                        return true;
+                    }
+                });
+
                 View emptyView = new View(this);
+                emptyView.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
                 setContentView(emptyView);
+            }
+
+            private void openApp(String packageName) {
+                PackageManager pm = getPackageManager();
+                Intent intent = pm.getLaunchIntentForPackage(packageName);
+                if (intent != null) {
+                    startActivity(intent);
+                } else {
+                    Toast.makeText(this, "App missing: " + packageName, Toast.LENGTH_SHORT).show();
+                }
             }
         }
         EOF
