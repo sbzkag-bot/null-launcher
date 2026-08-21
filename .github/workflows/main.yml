@@ -18,11 +18,18 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+        cache: 'gradle'
 
-    - name: Generate custom mapped launcher code
+    - name: Generate rock-solid launcher code
       run: |
         rm -rf app src res AndroidManifest.xml
         mkdir -p app/src/main/java/com/notriddle/nulllauncher
+
+        cat << 'EOF' > gradle.properties
+        org.gradle.jvmargs=-Xmx2048m
+        org.gradle.caching=true
+        org.gradle.parallel=true
+        EOF
 
         cat << 'EOF' > settings.gradle
         pluginManagement {
@@ -64,7 +71,11 @@ jobs:
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android">
             <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
-            <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+            <queries>
+                <package android:name="ginlemon.smartdrawer" />
+                <package android:name="com.tiendnm.zukulock" />
+            </queries>
 
             <application
                 android:label="Null Launcher"
@@ -75,6 +86,7 @@ jobs:
                     android:name=".MainActivity"
                     android:exported="true"
                     android:launchMode="singleInstance"
+                    android:excludeFromRecents="true"
                     android:stateNotNeeded="true">
                     <intent-filter>
                         <action android:name="android.intent.action.MAIN" />
@@ -100,16 +112,27 @@ jobs:
         import android.view.View;
         import android.view.Window;
         import android.view.WindowManager;
-        import android.widget.Toast;
+        import java.lang.reflect.Method;
 
         public class MainActivity extends Activity {
             private GestureDetector gestureDetector;
+            private PackageManager packageManager;
+            private Object statusBarService;
+            private Method expandNotificationMethod;
+            
             private static final String SWIPE_UP_PACKAGE = "ginlemon.smartdrawer";
             private static final String DOUBLE_TAP_PACKAGE = "com.tiendnm.zukulock";
 
             @Override
             protected void onCreate(Bundle savedInstanceState) {
                 super.onCreate(savedInstanceState);
+                packageManager = getPackageManager();
+
+                try {
+                    statusBarService = getSystemService("statusbar");
+                    Class<?> statusBarManager = Class.forName("android.app.StatusBarManager");
+                    expandNotificationMethod = statusBarManager.getMethod("expandNotificationsPanel");
+                } catch (Exception ignored) {}
 
                 Window w = getWindow();
                 w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
@@ -129,8 +152,12 @@ jobs:
                 }
 
                 gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
-                    private static final int SWIPE_THRESHOLD = 100;
-                    private static final int SWIPE_VELOCITY_THRESHOLD = 100;
+                    private static final int THRESHOLD = 80;
+
+                    @Override
+                    public boolean onDown(MotionEvent e) {
+                        return true;
+                    }
 
                     @Override
                     public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
@@ -138,53 +165,67 @@ jobs:
                         float diffY = e2.getY() - e1.getY();
                         float diffX = e2.getX() - e1.getX();
 
-                        if (Math.abs(diffY) > Math.abs(diffX)) {
-                            if (Math.abs(diffY) > SWIPE_THRESHOLD && Math.abs(velocityY) > SWIPE_VELOCITY_THRESHOLD) {
-                                if (diffY > 0) {
-                                    // Swipe Down -> Notifications
-                                    try {
-                                        Object service = getSystemService("statusbar");
-                                        Class<?> statusbarManager = Class.forName("android.app.StatusBarManager");
-                                        java.lang.reflect.Method expand = statusbarManager.getMethod("expandNotificationsPanel");
-                                        expand.invoke(service);
-                                    } catch (Exception ignored) {}
-                                } else {
-                                    // Swipe Up -> Smart Drawer
-                                    openApp(SWIPE_UP_PACKAGE);
-                                }
-                                return true;
+                        if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > THRESHOLD && Math.abs(velocityY) > THRESHOLD) {
+                            if (diffY > 0) {
+                                expandNotifications();
+                            } else {
+                                openApp(SWIPE_UP_PACKAGE);
                             }
+                            return true;
                         }
                         return false;
                     }
 
                     @Override
                     public boolean onDoubleTap(MotionEvent e) {
-                        // Double Tap -> Zuku Lock
                         openApp(DOUBLE_TAP_PACKAGE);
                         return true;
                     }
                 });
 
-                View emptyView = new View(this);
-                emptyView.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
+                View emptyView = new View(this) {
+                    @Override
+                    public boolean performClick() {
+                        return super.performClick();
+                    }
+                };
+                emptyView.setClickable(true);
+                emptyView.setFocusable(true);
+                emptyView.setOnTouchListener((v, event) -> {
+                    boolean handled = gestureDetector.onTouchEvent(event);
+                    if (!handled && event.getAction() == MotionEvent.ACTION_UP) {
+                        v.performClick();
+                    }
+                    return handled;
+                });
                 setContentView(emptyView);
             }
 
+            @Override
+            public void onBackPressed() {}
+
+            private void expandNotifications() {
+                try {
+                    if (expandNotificationMethod != null && statusBarService != null) {
+                        expandNotificationMethod.invoke(statusBarService);
+                    }
+                } catch (Exception ignored) {}
+            }
+
             private void openApp(String packageName) {
-                PackageManager pm = getPackageManager();
-                Intent intent = pm.getLaunchIntentForPackage(packageName);
-                if (intent != null) {
-                    startActivity(intent);
-                } else {
-                    Toast.makeText(this, "App missing: " + packageName, Toast.LENGTH_SHORT).show();
-                }
+                try {
+                    Intent intent = packageManager.getLaunchIntentForPackage(packageName);
+                    if (intent != null) {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                        startActivity(intent);
+                    }
+                } catch (Exception ignored) {}
             }
         }
         EOF
 
-    - name: Bake 64-bit APK
-      run: gradle assembleDebug
+    - name: Bake secure APK
+      run: gradle assembleDebug --build-cache --parallel
 
     - name: Save finished APK
       uses: actions/upload-artifact@v4.4.3
